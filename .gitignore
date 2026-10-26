@@ -1,0 +1,13 @@
+build/
+third_party/
+*.obj
+*.exe
+*.pdb
+*.ilk
+*.idb
+*.db
+*.db-wal
+*.db-shm
+*.aps
+*.user
+.vs/
