@@ -84,7 +84,7 @@ static void test_text(void) {
     EXPECT(result.cards == 1);
     EXPECT(result.image_cards == 0);
     EXPECT(ff_store_open(&store, "build/fixtures/text.db", err, (int)sizeof(err)) == 0);
-    EXPECT(ff_store_next_card(store, 1, now, day, &card) == 0);
+    EXPECT(ff_store_next_card(store, 1, now, day, 0, &card) == 0);
     EXPECT(card != NULL);
     if (card) {
         EXPECT(strcmp(card->front, "Hello") == 0);
@@ -95,7 +95,7 @@ static void test_text(void) {
         EXPECT(ff_store_save_answer(store, card, FF_GOOD, FF_STATE_NEW, 0, now, day) == 0);
         ff_study_card_free(card);
         card = NULL;
-        EXPECT(ff_store_next_card(store, 1, now + 600, day, &card) == 0);
+        EXPECT(ff_store_next_card(store, 1, now + 600, day, 0, &card) == 0);
         EXPECT(card && card->sched.state == FF_STATE_LEARNING);
         ff_study_card_free(card);
     }
@@ -113,7 +113,7 @@ static void test_media(void) {
     EXPECT(images >= 1);
     EXPECT(result.cards == 1);
     EXPECT(ff_store_open(&store, "build/fixtures/media.db", err, (int)sizeof(err)) == 0);
-    EXPECT(ff_store_next_card(store, 1, 1700000000, "2026-10-26", &card) == 0);
+    EXPECT(ff_store_next_card(store, 1, 1700000000, "2026-10-26", 0, &card) == 0);
     EXPECT(card && strstr(card->front, "See"));
     EXPECT(card && card->image_front && strstr(card->image_front, "pic.png"));
     EXPECT(card && card->audio_back && strstr(card->audio_back, "a.mp3"));
@@ -134,9 +134,51 @@ static void test_modern(void) {
     EXPECT(import_one("build/fixtures/modern.apkg", "build/fixtures/modern.db", "build/fixtures/modern-media", warn_reject, NULL, &result) == 0);
     EXPECT(result.cards == 1);
     EXPECT(ff_store_open(&store, "build/fixtures/modern.db", err, (int)sizeof(err)) == 0);
-    EXPECT(ff_store_next_card(store, 1, 1700000000, "2026-10-26", &card) == 0);
+    EXPECT(ff_store_next_card(store, 1, 1700000000, "2026-10-26", 0, &card) == 0);
     EXPECT(card && strcmp(card->front, "The [...] of France") == 0);
     EXPECT(card && strcmp(card->back, "The capital of France") == 0);
+    ff_study_card_free(card);
+    ff_store_close(store);
+}
+
+static void test_learn_ahead(void) {
+    FfStore *store = NULL;
+    FfStudyCard *card = NULL;
+    FfInsertCard insert;
+    int64_t deck_id = 0;
+    int64_t due = 0;
+    const int64_t now = 1700000000;
+    char err[128];
+    remove("build/fixtures/ahead.db");
+    remove("build/fixtures/ahead.db-wal");
+    remove("build/fixtures/ahead.db-shm");
+    EXPECT(ff_store_open(&store, "build/fixtures/ahead.db", err, (int)sizeof(err)) == 0);
+    if (!store) {
+        return;
+    }
+    EXPECT(ff_store_create_deck(store, "Ahead", 0, &deck_id) == 0);
+    memset(&insert, 0, sizeof(insert));
+    insert.deck_id = deck_id;
+    insert.front = "Soon";
+    insert.back = "Later";
+    insert.sched.state = FF_STATE_LEARNING;
+    insert.sched.ease = 2500;
+    insert.sched.due = now + 60;
+    EXPECT(ff_store_insert_card(store, &insert) == 0);
+    EXPECT(ff_store_next_card(store, deck_id, now, "2026-10-26", 0, &card) == 0);
+    EXPECT(card == NULL);
+    EXPECT(ff_store_next_learn_due(store, deck_id, now, &due) == 0);
+    EXPECT(due == now + 60);
+    EXPECT(ff_store_next_card(store, deck_id, now, "2026-10-26", 20 * 60, &card) == 0);
+    EXPECT(card && strcmp(card->front, "Soon") == 0);
+    ff_study_card_free(card);
+    card = NULL;
+    insert.front = "Fresh";
+    insert.sched.state = FF_STATE_NEW;
+    insert.sched.due = 0;
+    EXPECT(ff_store_insert_card(store, &insert) == 0);
+    EXPECT(ff_store_next_card(store, deck_id, now, "2026-10-26", 20 * 60, &card) == 0);
+    EXPECT(card && strcmp(card->front, "Fresh") == 0);
     ff_study_card_free(card);
     ff_store_close(store);
 }
@@ -150,6 +192,7 @@ int main(void) {
     test_text();
     test_media();
     test_modern();
+    test_learn_ahead();
     if (g_failed) {
         printf("%d import test(s) failed\n", g_failed);
         return 1;

@@ -20,6 +20,7 @@ static int g_failed = 0;
 static FfSchedConfig cfg_plain(void) {
     FfSchedConfig cfg;
     ff_sched_config_default(&cfg);
+    EXPECT(cfg.learn_ahead_secs == 20 * 60);
     cfg.fuzz = 0;
     return cfg;
 }

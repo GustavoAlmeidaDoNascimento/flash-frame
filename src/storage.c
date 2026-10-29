@@ -457,7 +457,7 @@ static int day_count(FfStore *store, int64_t deck_id, const char *day, const cha
     return value;
 }
 
-int ff_store_next_card(FfStore *store, int64_t deck_id, int64_t now, const char *day, FfStudyCard **out) {
+int ff_store_next_card(FfStore *store, int64_t deck_id, int64_t now, const char *day, int64_t learn_ahead_secs, FfStudyCard **out) {
     sqlite3_stmt *limits = NULL;
     int new_limit = 20;
     int review_limit = 200;
@@ -502,6 +502,29 @@ int ff_store_next_card(FfStore *store, int64_t deck_id, int64_t now, const char 
             return found < 0 ? -1 : 0;
         }
     }
+    if (learn_ahead_secs > 0) {
+        found = query_one_card(store, learning_sql, deck_id, now + learn_ahead_secs, 1, out);
+        if (found != 0) {
+            return found < 0 ? -1 : 0;
+        }
+    }
+    return 0;
+}
+
+int ff_store_next_learn_due(FfStore *store, int64_t deck_id, int64_t after, int64_t *due) {
+    sqlite3_stmt *stmt = NULL;
+    const char *sql =
+        "SELECT MIN(due) FROM cards WHERE deck_id=?1 AND suspended=0 AND state IN (1, 3) AND due>?2";
+    *due = 0;
+    if (sqlite3_prepare_v2(store->db, sql, -1, &stmt, NULL) != SQLITE_OK) {
+        return -1;
+    }
+    sqlite3_bind_int64(stmt, 1, deck_id);
+    sqlite3_bind_int64(stmt, 2, after);
+    if (sqlite3_step(stmt) == SQLITE_ROW && sqlite3_column_type(stmt, 0) != SQLITE_NULL) {
+        *due = sqlite3_column_int64(stmt, 0);
+    }
+    sqlite3_finalize(stmt);
     return 0;
 }
 

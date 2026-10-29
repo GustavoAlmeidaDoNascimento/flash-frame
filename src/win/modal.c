@@ -57,6 +57,25 @@ void hook_edit(HWND edit) {
     }
 }
 
+static int shift_return_breaks_line(HWND dialog, const MSG *message) {
+    HWND focus;
+    if (message->message != WM_KEYDOWN || message->wParam != VK_RETURN) {
+        return 0;
+    }
+    if ((GetKeyState(VK_SHIFT) & 0x8000) == 0) {
+        return 0;
+    }
+    focus = GetFocus();
+    if (!focus || !IsChild(dialog, focus)) {
+        return 0;
+    }
+    if ((GetWindowLongW(focus, GWL_STYLE) & ES_MULTILINE) == 0) {
+        return 0;
+    }
+    SendMessageW(focus, EM_REPLACESEL, TRUE, (LPARAM)L"\r\n");
+    return 1;
+}
+
 void modal_loop(App *app, HWND owner, HWND dialog, HWND focus) {
     MSG message;
     app->modal++;
@@ -72,6 +91,9 @@ void modal_loop(App *app, HWND owner, HWND dialog, HWND focus) {
                 PostQuitMessage((int)message.wParam);
             }
             break;
+        }
+        if (shift_return_breaks_line(dialog, &message)) {
+            continue;
         }
         if (!IsDialogMessageW(dialog, &message)) {
             TranslateMessage(&message);

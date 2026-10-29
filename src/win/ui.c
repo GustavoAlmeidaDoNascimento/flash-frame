@@ -174,8 +174,16 @@ void app_pull_card(App *app) {
         return;
     }
     today(day, sizeof(day));
-    if (ff_store_next_card(app->store, app->deck_id, now, day, &app->card) != 0) {
+    app->next_due = 0;
+    if (ff_store_next_card(app->store, app->deck_id, now, day, app->sched.learn_ahead_secs, &app->card) != 0) {
         app->card = NULL;
+    }
+    if (!app->card) {
+        int64_t ahead = app->sched.learn_ahead_secs;
+        if (ahead < 0) {
+            ahead = 0;
+        }
+        ff_store_next_learn_due(app->store, app->deck_id, now + ahead, &app->next_due);
     }
     app->mode = MODE_REVIEW;
     present_media(app);
@@ -398,7 +406,16 @@ static void paint_card(App *app, HDC hdc, const Layout *layout) {
     }
     text.bottom -= app_px(app, 20);
     if (!app->card) {
-        paint_utf8(hdc, "You're caught up.", text, RGB(200, 200, 206), app->font_body, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+        char line[64];
+        int64_t left = app->next_due - (int64_t)time(NULL);
+        if (app->next_due > 0 && left > 0) {
+            char span[16];
+            ff_format_span(left, span, sizeof(span));
+            snprintf(line, sizeof(line), "Next card in %s", span);
+        } else {
+            snprintf(line, sizeof(line), "You're caught up.");
+        }
+        paint_utf8(hdc, line, text, RGB(200, 200, 206), app->font_body, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
         paint_review_hint(app, hdc, layout);
         return;
     }
@@ -603,10 +620,8 @@ void app_click(App *app, int x, int y) {
         app_select_deck(app, app->decks[hit - HIT_DECK_BASE].id);
         return;
     }
-    if (hit == HIT_SHOW || hit == HIT_CARD) {
-        if (app->card && !app->revealed) {
-            app_reveal(app);
-        }
+    if (hit == HIT_SHOW) {
+        app_reveal(app);
         return;
     }
     if (hit == HIT_PLAY && current_audio(app) && media_file(app, current_audio(app), path, FF_PATH_MAX)) {

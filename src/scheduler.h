@@ -35,6 +35,7 @@ typedef struct FfSchedConfig {
     int lapse_new_permille;
     int64_t lapse_min_secs;
     int64_t max_secs;
+    int64_t learn_ahead_secs;
     int fuzz;
 } FfSchedConfig;
 

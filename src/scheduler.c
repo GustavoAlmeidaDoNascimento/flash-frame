@@ -20,6 +20,7 @@ void ff_sched_config_default(FfSchedConfig *cfg) {
     cfg->lapse_new_permille = 0;
     cfg->lapse_min_secs = 86400;
     cfg->max_secs = 36500ll * 86400ll;
+    cfg->learn_ahead_secs = 20 * 60;
     cfg->fuzz = 1;
 }
 

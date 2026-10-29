@@ -65,7 +65,8 @@ int ff_store_commit(FfStore *store);
 int ff_store_rollback(FfStore *store);
 int ff_store_insert_card(FfStore *store, const FfInsertCard *card);
 
-int ff_store_next_card(FfStore *store, int64_t deck_id, int64_t now, const char *day, FfStudyCard **out);
+int ff_store_next_card(FfStore *store, int64_t deck_id, int64_t now, const char *day, int64_t learn_ahead_secs, FfStudyCard **out);
+int ff_store_next_learn_due(FfStore *store, int64_t deck_id, int64_t after, int64_t *due);
 void ff_study_card_free(FfStudyCard *card);
 int ff_store_save_answer(
     FfStore *store,

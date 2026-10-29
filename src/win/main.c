@@ -10,6 +10,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #include <windowsx.h>
 
 static void show_utf8(HWND owner, const char *text) {
@@ -185,6 +186,18 @@ static void on_timer(App *app) {
             EmptyWorkingSet(GetCurrentProcess());
             app->last_trim = now;
             app->working_set = sample_working_set();
+        }
+    }
+    if (!app->busy && !app->modal && app->mode == MODE_REVIEW && !app->card && app->next_due > 0) {
+        int64_t now = (int64_t)time(NULL);
+        int64_t ahead = app->sched.learn_ahead_secs;
+        if (ahead < 0) {
+            ahead = 0;
+        }
+        if (now + ahead >= app->next_due) {
+            app_pull_card(app);
+        } else {
+            InvalidateRect(app->hwnd, NULL, FALSE);
         }
     }
     mb = app->working_set / (1024ull * 1024ull);

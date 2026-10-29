@@ -46,6 +46,7 @@ typedef struct App {
     int deck_count;
     int deck_scroll;
     FfStudyCard *card;
+    int64_t next_due;
     int revealed;
     int mode;
     int hot;
